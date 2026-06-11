@@ -148,6 +148,7 @@
     gap: 8px;
   }
   #buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  #btnHelp { grid-column: span 3; }
   button {
     font-family: inherit;
     background: var(--accent);
@@ -272,25 +273,38 @@
     100% { transform: translate(var(--dx), var(--dy)) scale(1.25); opacity: 0; }
   }
 
-  /* ===== スマホ(縦持ち)対応: フロアを上、操作パネルを下に縦積み ===== */
+  /* ===== スマホ(縦持ち)対応: フロアを最大化し、操作パネルは下にコンパクトに ===== */
   @media (max-width: 700px) {
     #main { flex-direction: column; }
-    #floorWrap { flex: none; height: 52dvh; padding: 6px; }
+    /* フロアが残り画面をすべて使う */
+    #floorWrap { flex: 1; min-height: 0; padding: 4px; }
+    /* 操作パネルは中身ぶんの高さだけ */
     #side {
-      flex: 1; min-height: 0;
+      flex: none;
       max-width: none; min-width: 0;
       border-left: none; border-top: 4px solid var(--brown);
-      padding: 8px; gap: 6px;
+      padding: 6px 8px 8px; gap: 5px;
     }
-    #header { gap: 8px; padding: 6px 10px; }
+    #header { gap: 8px; padding: 5px 10px; }
     #header h1 { font-size: 14px; letter-spacing: 1px; margin-right: 2px; }
-    .stat { font-size: 12px; }
-    #dayProgress { width: 60px; }
+    .stat { font-size: 11.5px; }
+    #dayProgress { width: 56px; }
     .floorShiba { width: 54px; }
     .floorShiba .name { font-size: 9px; }
     .customer { width: 86px; }
-    button { font-size: 12px; padding: 7px 3px; }
-    #log { height: 76px; flex-shrink: 0; }
+    /* ボタンは4列×2行に圧縮 */
+    #buttons { grid-template-columns: repeat(4, 1fr); gap: 4px; }
+    button { font-size: 11px; padding: 6px 2px; border-radius: 8px; }
+    #btnHelp { grid-column: span 2; }
+    /* 柴犬リストは横スクロールの1段に */
+    #shibaList {
+      flex: none; flex-direction: row;
+      overflow-x: auto; overflow-y: hidden;
+      padding-bottom: 2px;
+    }
+    .shibaCard { min-width: 172px; flex-shrink: 0; padding: 4px 6px; }
+    .shibaCard .portrait { width: 36px; }
+    #log { height: 60px; flex-shrink: 0; font-size: 10.5px; }
     #dexGrid { gap: 3px; }
     .dexCell .portrait { width: 28px; }
     #modal { padding: 14px; }
@@ -321,7 +335,7 @@
       <button id="btnClean" class="green">🧹 そうじ</button>
       <button id="btnSave">💾 セーブ</button>
       <button id="btnReset" class="red">🗑️ リセット</button>
-      <button id="btnHelp" class="green" style="grid-column: span 3">❓ 遊び方</button>
+      <button id="btnHelp" class="green">❓ 遊び方</button>
     </div>
     <div style="font-size:12px;font-weight:bold;color:var(--brown)">うちの柴犬たち(クリックでお世話)</div>
     <div id="shibaList"></div>
@@ -1055,6 +1069,7 @@ document.getElementById("modalOverlay").addEventListener("click", e => {
 const floorEls = new Map(); // id -> element
 
 function render() {
+  fitFloor(); // パネルの高さ変化(柴犬カード増減など)にフロアを追従させる
   // header
   document.getElementById("stDay").textContent = S.day + "日目";
   document.getElementById("stMoney").textContent = fmt(S.money);
