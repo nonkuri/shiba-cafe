@@ -49,6 +49,12 @@
     border-radius: 4px; overflow: hidden;
   }
   #dayProgressFill { height: 100%; width: 0%; background: #ffd98e; transition: width .5s linear; }
+  #btnPause {
+    background: rgba(255,255,255,.18); border: none; color: inherit;
+    font: inherit; font-size: 13px; font-weight: bold;
+    padding: 3px 9px; border-radius: 6px; cursor: pointer;
+  }
+  #btnPause:hover { background: rgba(255,255,255,.32); }
 
   /* ===== main layout ===== */
   #main { flex: 1; display: flex; min-height: 0; }
@@ -290,6 +296,7 @@
     #header h1 { font-size: 14px; letter-spacing: 1px; margin-right: 2px; }
     .stat { font-size: 11.5px; }
     #dayProgress { width: 56px; }
+    #btnPause { font-size: 11px; padding: 2px 7px; }
     .floorShiba { width: 54px; }
     .floorShiba .name { font-size: 9px; }
     .customer { width: 86px; }
@@ -329,6 +336,7 @@
   <h1>🐕 柴犬カフェ繁盛記</h1>
   <div class="stat"><span class="icon">📅</span><span id="stDay">1日目</span></div>
   <div id="dayProgress"><div id="dayProgressFill"></div></div>
+  <button id="btnPause" title="一時停止">⏸️</button>
   <div class="stat"><span class="icon">💰</span><span id="stMoney">0</span>G</div>
   <div class="stat"><span class="icon">⭐</span>評判 <span id="stRep">0</span></div>
   <div class="stat"><span class="icon">🧹</span>清潔 <span id="stClean">100</span>%</div>
@@ -455,8 +463,13 @@ function initialState() {
     seatLv: 1, kennelLv: 1,
     shibas: [], customers: [], dex: {},
     daySales: 0, dayGuests: 0, dayAdoptAsked: false,
+    dayLedger: {},
     paused: false,
   };
+}
+// 営業終了のまとめ用に、売上・餌代以外のお金の動きを項目別に記録する
+function ledger(label, amount) {
+  S.dayLedger[label] = (S.dayLedger[label] || 0) + amount;
 }
 function seats() { return 2 + S.seatLv; }            // Lv1=3席
 function maxShibas() { return 1 + S.kennelLv; }      // Lv1=2頭
@@ -545,6 +558,7 @@ function scout() {
   if (S.money < SCOUT_COST) { addLog("お金が足りない…(スカウトには500G必要)"); return; }
   if (S.shibas.length >= maxShibas()) { addLog("柴犬スペースがいっぱい!店舗拡張で増やそう"); return; }
   S.money -= SCOUT_COST;
+  ledger("🎁 スカウト", -SCOUT_COST);
   const coat = pickWeighted(COATS);
   const trait = pickWeighted(TRAITS);
   const rar = RARITY[pickWeighted(Object.fromEntries(RARITY.map((r, i) => [i, r])))];
@@ -556,6 +570,7 @@ function scout() {
   if (isNew) {
     S.dex[dexKey] = true;
     S.money += 300; // 図鑑初登録ボーナス
+    ledger("📖 図鑑ボーナス", 300);
   }
   addLog(`🎁 ${COATS[coat].name}の「${shiba.name}」(★${rar.stars}・${TRAITS[trait].name}) が仲間入り!`, true);
   if (isNew) addLog("📖 図鑑に新登録!ボーナス +300G", true);
@@ -776,12 +791,18 @@ function endDay() {
   S.money -= feed;
   if (S.money < 0) { gameOver(feed); return; }
   const sales = S.daySales, guests = S.dayGuests;
-  const net = sales - feed;
+  // 売上・餌代以外のお金の動き(スカウト・おやつ・店舗拡張・譲渡のお礼など)も差引に反映
+  const extras = Object.entries(S.dayLedger || {}).filter(([, v]) => v !== 0);
+  const extraSum = extras.reduce((sum, [, v]) => sum + v, 0);
+  const extraRows = extras.map(([label, v]) =>
+    `<tr><td>${label}</td><td style="color:${v > 0 ? "var(--green)" : "var(--red)"}">${v > 0 ? "+" : "-"}${fmt(Math.abs(v))} G</td></tr>`).join("");
+  const net = sales + extraSum - feed;
   showModal(`
     <h2>🌙 ${S.day}日目 営業終了</h2>
     <table class="sumTable">
       <tr><td>来店客数</td><td>${guests} 人</td></tr>
       <tr><td>売上</td><td>${fmt(sales)} G</td></tr>
+      ${extraRows}
       <tr><td>🍖 餌代(${S.shibas.length}頭)</td><td style="color:var(--red)">-${fmt(feed)} G</td></tr>
       <tr><td>差引</td><td style="color:${net >= 0 ? "var(--green)" : "var(--red)"}">${net >= 0 ? "+" : ""}${fmt(net)} G</td></tr>
       <tr><td>評判</td><td>⭐ ${Math.floor(S.rep)} / 100</td></tr>
@@ -820,8 +841,24 @@ function restartGame() {
   render();
 }
 
+function pauseGame() {
+  if (S.paused) return; // 営業終了やイベントの最中はすでに止まっている
+  S.paused = true;
+  showModal(`
+    <h2>⏸️ ひとやすみ中</h2>
+    <p style="text-align:center;font-size:13px;line-height:1.8">
+      時間は止まっています。ゆっくりどうぞ 🍵
+    </p>
+    <div class="actions"><button onclick="resumeGame()">▶️ 営業を再開する</button></div>`, true);
+}
+function resumeGame() {
+  S.paused = false;
+  closeModal();
+}
+
 function nextDay() {
   S.day++; S.tick = 0; S.daySales = 0; S.dayGuests = 0;
+  S.dayLedger = {};
   S.dayAdoptAsked = false;
   S.paused = false;
   closeModal();
@@ -854,7 +891,7 @@ function openShibaMenu(id) {
       </div>
     </div>
     <div class="actions">
-      <button class="green" onclick="brushShiba(${s.id})">🪮 ブラッシング<br><span style="font-size:10px">換毛リセット・機嫌+10</span></button>
+      <button class="green" onclick="brushShiba(${s.id})">🪮 ブラッシング<br><span style="font-size:10px">換毛リセット(30以上で機嫌+10)</span></button>
       <button onclick="treatShiba(${s.id})">🦴 おやつ ${TREAT_COST}G<br><span style="font-size:10px">機嫌+30</span></button>
       <button onclick="trainShiba(${s.id})" ${maxLv || S.money < trainCost ? "disabled" : ""}>🎓 しつけ ${maxLv ? "-" : trainCost + "G"}<br><span style="font-size:10px">Lv UP・収入&お行儀UP</span></button>
       <button class="red" onclick="closeModal()">とじる</button>
@@ -864,10 +901,12 @@ function openShibaMenu(id) {
 function brushShiba(id) {
   const s = S.shibas.find(x => x.id === id);
   if (!s) return;
+  const groomed = s.fur >= 30; // もつれた毛を整えるから気持ちいい。連打では機嫌は上がらない
   s.fur = 0;
-  s.mood = clamp(s.mood + 10, 0, 100);
+  if (groomed) s.mood = clamp(s.mood + 10, 0, 100);
   if (s.frozen > 0) s.frozen = 0;
-  addLog(`🪮 ${s.name} をブラッシング。うっとり顔だ`);
+  addLog(groomed ? `🪮 ${s.name} をブラッシング。うっとり顔だ`
+                 : `🪮 ${s.name} をブラッシング。まだ毛玉がないので気持ちよさは控えめ`);
   shibaFx(s, ["🪮", "🌫️", "✨"], 10);
   openShibaMenu(id);
   render();
@@ -877,6 +916,7 @@ function treatShiba(id) {
   if (!s) return;
   if (S.money < TREAT_COST) { addLog("おやつ代が足りない…"); return; }
   S.money -= TREAT_COST;
+  ledger("🦴 おやつ", -TREAT_COST);
   s.mood = clamp(s.mood + 30, 0, 100);
   if (s.frozen > 0) { s.frozen = 0; addLog(`🦴 おやつの力で ${s.name} の拒否柴が解除された!`); }
   else addLog(`🦴 ${s.name} におやつ。しっぽが高速回転している`);
@@ -890,6 +930,7 @@ function trainShiba(id) {
   const cost = 200 * s.level;
   if (S.money < cost) { addLog("しつけ教室の費用が足りない…"); return; }
   S.money -= cost;
+  ledger("🎓 しつけ", -cost);
   s.level++;
   addLog(`🎓 ${s.name} が Lv.${s.level} に!お利口になった`, true);
   shibaFx(s, ["🎓", "⭐", "✨"], 10);
@@ -947,6 +988,7 @@ function acceptAdoption(id, price) {
     }
     S.shibas = S.shibas.filter(x => x.id !== id);
     S.money += price;
+    ledger("🏠 譲渡のお礼", price);
     S.rep = clamp(S.rep + 3, 0, 100);
     addLog(`🏠 ${s.name} は素敵な家族のもとへ旅立った。お礼 +${fmt(price)}G・評判UP!`, true);
   }
@@ -976,13 +1018,13 @@ function openExpand() {
 }
 function buySeat() {
   if (S.money < seatCost()) return;
-  S.money -= seatCost(); S.seatLv++;
+  S.money -= seatCost(); ledger("🏗️ 店舗拡張", -seatCost()); S.seatLv++;
   addLog(`🪑 客席を拡張!${seats()}席になった`, true);
   openExpand(); render();
 }
 function buyKennel() {
   if (S.money < kennelCost()) return;
-  S.money -= kennelCost(); S.kennelLv++;
+  S.money -= kennelCost(); ledger("🏗️ 店舗拡張", -kennelCost()); S.kennelLv++;
   addLog(`🐕 柴犬スペースを拡張!${maxShibas()}頭まで飼える`, true);
   openExpand(); render();
 }
@@ -1004,7 +1046,7 @@ function openHelp() {
       <h3>🐕 柴犬のお世話(柴犬かカードをクリック)</h3>
       <ul>
         <li><b>ご機嫌は自動では回復しない!</b> 放っておくと下がる一方で、収入もふれあい効果も落ちる</li>
-        <li>🪮 <b>ブラッシング(無料)</b>: 機嫌+10、換毛ゲージをリセット</li>
+        <li>🪮 <b>ブラッシング(無料)</b>: 換毛ゲージをリセット。ゲージが30以上たまっている時は機嫌も+10(毛玉のない子を何度ブラッシングしても機嫌は上がらない)</li>
         <li>🦴 <b>おやつ(50G)</b>: 機嫌+30。拒否柴モードも解除できる</li>
         <li>🎓 <b>しつけ</b>: レベルが上がると収入アップ&問題行動が減る(最大Lv5)</li>
         <li>換毛ゲージがたまると抜け毛で店が汚れる。こまめにブラッシング!</li>
@@ -1175,6 +1217,7 @@ function loadGame() {
     const data = JSON.parse(raw);
     S = data.S; uid = data.uid;
     S.customers = []; S.paused = false;
+    S.dayLedger = S.dayLedger || {}; // 旧セーブデータとの互換
     return true;
   } catch (e) { return false; }
 }
@@ -1244,6 +1287,7 @@ document.getElementById("btnClean").addEventListener("click", cleanShop);
 document.getElementById("btnSave").addEventListener("click", () => saveGame());
 document.getElementById("btnReset").addEventListener("click", resetGame);
 document.getElementById("btnHelp").addEventListener("click", openHelp);
+document.getElementById("btnPause").addEventListener("click", pauseGame);
 
 if (!loadGame()) {
   S = initialState();
