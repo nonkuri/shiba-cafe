@@ -149,6 +149,7 @@
   }
   #buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
   #btnHelp { grid-column: span 3; }
+  #buttons .bSub { display: block; font-size: 10px; }
   button {
     font-family: inherit;
     background: var(--accent);
@@ -292,19 +293,30 @@
     .floorShiba { width: 54px; }
     .floorShiba .name { font-size: 9px; }
     .customer { width: 86px; }
-    /* ボタンは4列×2行に圧縮 */
-    #buttons { grid-template-columns: repeat(4, 1fr); gap: 4px; }
-    button { font-size: 11px; padding: 6px 2px; border-radius: 8px; }
-    #btnHelp { grid-column: span 2; }
-    /* 柴犬リストは横スクロールの1段に */
+    /* ボタンはアイコン+極小ラベルの1行に圧縮 */
+    #buttons { display: flex; gap: 3px; }
+    #buttons button {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 4px 0; border-radius: 8px;
+    }
+    .bIcon { font-size: 16px; line-height: 1.15; }
+    .bLabel { font-size: 8.5px; line-height: 1.2; white-space: nowrap; }
+    #buttons .bSub { display: none; } /* スカウト費はボタンの無効化とログで分かる */
+    /* 柴犬リストはタグ類を省いたミニカードの横スクロール1段に */
+    #sideLabel { display: none; }
     #shibaList {
       flex: none; flex-direction: row;
       overflow-x: auto; overflow-y: hidden;
       padding-bottom: 2px;
     }
-    .shibaCard { min-width: 172px; flex-shrink: 0; padding: 4px 6px; }
-    .shibaCard .portrait { width: 36px; }
-    #log { height: 60px; flex-shrink: 0; font-size: 10.5px; }
+    .shibaCard { min-width: 100px; flex-shrink: 0; padding: 3px 5px; gap: 5px; }
+    .shibaCard .portrait { width: 30px; }
+    .shibaCard .nameRow { font-size: 10px; }
+    .shibaCard .nameRow span { display: none; } /* 毛色・性格タグ、★、Lvを非表示 */
+    .gaugeLabel { display: none; } /* 赤=ご機嫌、茶=換毛ゲージ */
+    .gauge { height: 5px; margin-top: 2px; }
+    #log { height: 48px; flex-shrink: 0; font-size: 10.5px; }
     #dexGrid { gap: 3px; }
     .dexCell .portrait { width: 28px; }
     #modal { padding: 14px; }
@@ -329,15 +341,15 @@
   </div>
   <div id="side">
     <div id="buttons">
-      <button id="btnScout">🎁 スカウト<br><span style="font-size:10px">500G</span></button>
-      <button id="btnDex" class="green">📖 柴犬図鑑</button>
-      <button id="btnExpand">🏗️ 店舗拡張</button>
-      <button id="btnClean" class="green">🧹 そうじ</button>
-      <button id="btnSave">💾 セーブ</button>
-      <button id="btnReset" class="red">🗑️ リセット</button>
-      <button id="btnHelp" class="green">❓ 遊び方</button>
+      <button id="btnScout"><span class="bIcon">🎁</span> <span class="bLabel">スカウト</span><span class="bSub" id="scoutSub">500G</span></button>
+      <button id="btnDex" class="green"><span class="bIcon">📖</span> <span class="bLabel">柴犬図鑑</span></button>
+      <button id="btnExpand"><span class="bIcon">🏗️</span> <span class="bLabel">店舗拡張</span></button>
+      <button id="btnClean" class="green"><span class="bIcon">🧹</span> <span class="bLabel">そうじ</span></button>
+      <button id="btnSave"><span class="bIcon">💾</span> <span class="bLabel">セーブ</span></button>
+      <button id="btnReset" class="red"><span class="bIcon">🗑️</span> <span class="bLabel">リセット</span></button>
+      <button id="btnHelp" class="green"><span class="bIcon">❓</span> <span class="bLabel">遊び方</span></button>
     </div>
-    <div style="font-size:12px;font-weight:bold;color:var(--brown)">うちの柴犬たち(クリックでお世話)</div>
+    <div id="sideLabel" style="font-size:12px;font-weight:bold;color:var(--brown)">うちの柴犬たち(クリックでお世話)</div>
     <div id="shibaList"></div>
     <div id="log"></div>
   </div>
@@ -1078,10 +1090,9 @@ function render() {
   document.getElementById("stSeats").textContent = `${S.customers.length}/${seats()}`;
   document.getElementById("dayProgressFill").style.width = (S.tick / DAY_TICKS * 100) + "%";
   const kennelFull = S.shibas.length >= maxShibas();
-  const btnScout = document.getElementById("btnScout");
-  btnScout.disabled = S.money < SCOUT_COST || kennelFull;
-  btnScout.innerHTML = "🎁 スカウト<br><span style=\"font-size:10px\">" +
-    (kennelFull ? "柴犬枠がいっぱい!" : S.money < SCOUT_COST ? "500G たりない…" : "500G") + "</span>";
+  document.getElementById("btnScout").disabled = S.money < SCOUT_COST || kennelFull;
+  document.getElementById("scoutSub").textContent =
+    kennelFull ? "柴犬枠がいっぱい!" : S.money < SCOUT_COST ? "500G たりない…" : "500G";
 
   // floor: 柴犬と客
   const floor = document.getElementById("floor");
