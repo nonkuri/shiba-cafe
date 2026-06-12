@@ -543,10 +543,21 @@ function isSleeping(s) {
 
 /* ================= 柴犬生成・ガチャ ================= */
 
+// 今カフェにいる子と同じ名前は避ける。全部使用中なら番号つき(まる2、まる3…)
+function pickName() {
+  const used = new Set(S.shibas.map(s => s.name));
+  const avail = NAMES.filter(n => !used.has(n));
+  if (avail.length) return avail[Math.floor(Math.random() * avail.length)];
+  for (let i = 2; ; i++) {
+    const n = NAMES[Math.floor(Math.random() * NAMES.length)] + i;
+    if (!used.has(n)) return n;
+  }
+}
+
 function makeShiba(coat, trait, stars) {
   return {
     id: uid++,
-    name: NAMES[Math.floor(Math.random() * NAMES.length)],
+    name: pickName(),
     coat, trait, stars,
     level: stars, mood: 80, fur: rand(0, 30),
     x: rand(10, 75), y: rand(35, 75),
